@@ -9,8 +9,7 @@ import sys
 sys.path.append("PATH TO FIT LM UTILS FOLDER")
 from eval_utils import fit_ILM
 
-
-TIME_VERSIONING_DATA_PATH = "data/processed_data/time_versioning"
+TIME_VERSIONING_DATA_PATH = "data/processed_data/time_versioning/"
 TRAINED_MODELS_DATA_PATH = "trained_models/"
 
 
@@ -91,7 +90,6 @@ def train_gpb(location_type, likelihood, year, feature_cols, target_col, coords_
             likelihood=likelihood, 
         )
 
-    # categorical_cols = ["occupancy", "loan_purpose", "first_time_homebuyer", "MSA", "number_of_borrowers"]
     X_train, Y_train = pd.get_dummies(X_train_df, columns=categorical_cols, drop_first=True).to_numpy(), Y_train_df.to_numpy()
     data_train = gpb.Dataset(data=X_train, label=Y_train.flatten())
 
@@ -108,7 +106,6 @@ def train_itb(nlls, year, feature_cols, target_col, categorical_cols):
 
     X_train_df, Y_train_df = train_df[feature_cols], train_df[target_col]
 
-    # categorical_cols = ["occupancy", "loan_purpose", "first_time_homebuyer", "MSA", "number_of_borrowers"]
     X_train, Y_train = pd.get_dummies(X_train_df, columns=categorical_cols, drop_first=True).to_numpy(), Y_train_df.to_numpy()
     
     (N_train, P_train) = X_train.shape
@@ -147,10 +144,12 @@ def train_itb(nlls, year, feature_cols, target_col, categorical_cols):
 # -------------------------------------------------------
 def train_ilm(nlls, year, feature_cols, target_col, categorical_cols):
     train_df = pd.read_feather(TIME_VERSIONING_DATA_PATH+f"{year}_snapshot/training_data.feather")
+    # test_df = pd.read_feather(TIME_VERSIONING_DATA_PATH+f"{year}_snapshot/testing_data.feather")
+
+    # train_idx, test_idx = train_df.index.to_numpy(), test_df.index.to_numpy()
+    # data = pd.concat([train_df, test_df], ignore_index=False)
 
     X_df, Y_df = train_df[feature_cols], train_df[target_col]
-
-    # categorical_cols = ["occupancy", "loan_purpose", "first_time_homebuyer", "MSA", "number_of_borrowers"]
 
     X_np, Y_np = pd.get_dummies(X_df, columns=categorical_cols, drop_first=True).to_numpy(), Y_df.to_numpy()
 
@@ -158,11 +157,13 @@ def train_ilm(nlls, year, feature_cols, target_col, categorical_cols):
     X_std = scaler.fit_transform(X_np)
     # Augmenting feature matrices
     Xaug_std = np.c_[np.ones(X_std.shape[0]), X_std]
+
+    # Xaug_train, Y_train = Xaug_std[train_idx, :], Y_np[train_idx]
     
     for nll_name in nlls.keys():
         nll_func, N_aux_params = nlls[nll_name]['obj'], nlls[nll_name]['N_aux_params']
         
         fitted_model = fit_ILM(nll_func, Xaug_std, Y_np.flatten(), N_aux_params)
 
-        with open(TRAINED_MODELS_DATA_PATH + f'ilms/{nll_name}_{year}.pickle', 'wb') as handle:
+        with open(TRAINED_MODELS_DATA_PATH + f'ilms/{nll_name}_{year}_fixed.pickle', 'wb') as handle:
             pickle.dump(fitted_model, handle)

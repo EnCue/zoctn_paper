@@ -8,9 +8,9 @@ import jax
 import jax.numpy as jnp
 
 import sys
-sys.path.append("PATH TO EVAL UTILS FOLDER")
+# sys.path.append("PATH TO eval_utils")
 from eval_utils import AIC_BIC, crps
-sys.path.append("PATH TO FIT LM UTILS FOLDER")
+# sys.path.append("PATH TO fit_lm")
 from fit_lm import fit_ILM
 
 jax.config.update("jax_enable_x64", True)
@@ -325,3 +325,235 @@ def MDW_sample(X, mu, aux_params=None, aux_transformed=True):
         y[idxc] = yc
 
     return y
+
+
+# ------------------------------------------------------------------
+# CODE FOR PLOTTING EMPIRICAL DISTRIBUTIONS
+# ------------------------------------------------------------------
+import matplotlib.pyplot as plt
+
+def show_empirical_distributions(zoctn_y, zoctb_y, zocsg_y, md2_y, md5_y):
+    lgd_max, lgd_min = 1.1, -0.1
+
+    bin_h = 1/32
+    bins_int = np.arange(0, 1 + bin_h, step=bin_h)
+    bins_ext_l = np.arange(0, lgd_min - bin_h, step=-bin_h)
+    bins_ext_r = np.arange(1, lgd_max + bin_h, step=bin_h)
+
+    bins = np.concatenate((bins_ext_l[:0:-1], bins_int, bins_ext_r[1:]))
+    borders = np.array([-bin_h/2, bin_h/2, 1 - bin_h/2, 1 + bin_h/2])
+
+    zoctn_responses = pd.Series(zoctn_y)
+    zoctn_int = zoctn_responses[(zoctn_responses > 0.0) & (zoctn_responses < 1.0)].to_numpy().ravel()
+    zoctn_bd = zoctn_responses[(zoctn_responses==0.0) | (zoctn_responses==1.0)].to_numpy().ravel()
+
+    zoctb_responses = pd.Series(zoctb_y)
+    zoctb_int = zoctb_responses[(zoctb_responses > 0.0) & (zoctb_responses < 1.0)].to_numpy().ravel()
+    zoctb_bd = zoctb_responses[(zoctb_responses==0.0) | (zoctb_responses==1.0)].to_numpy().ravel()
+
+    zocsg_responses = pd.Series(zocsg_y)
+    zocsg_int = zocsg_responses[(zocsg_responses > 0.0) & (zocsg_responses < 1.0)].to_numpy().ravel()
+    zocsg_bd = zocsg_responses[(zocsg_responses==0.0) | (zocsg_responses==1.0)].to_numpy().ravel()
+
+    md2_responses = pd.Series(md2_y)
+    md2_int = md2_responses[(md2_responses > 0.0) & (md2_responses < 1.0)].to_numpy().ravel()
+    md2_bd = md2_responses[(md2_responses == 0.0) | (md2_responses == 1.0)].to_numpy().ravel()
+
+    md5_responses = pd.Series(md5_y)
+    md5_int = md5_responses[(md5_responses > 0.0) & (md5_responses < 1.0)].to_numpy().ravel()
+    md5_bd = md5_responses[(md5_responses == 0.0) | (md5_responses == 1.0)].to_numpy().ravel()
+
+    n_total = 2000
+
+    # --- Figure layout: 3 on top, 2 centered underneath ---
+    fig = plt.figure(figsize=(12, 6), dpi=200, constrained_layout=True)
+    gs = fig.add_gridspec(2, 6)
+
+    axs = [
+        fig.add_subplot(gs[0, 0:2]),  # top-left
+        fig.add_subplot(gs[0, 2:4]),  # top-center
+        fig.add_subplot(gs[0, 4:6]),  # top-right
+        fig.add_subplot(gs[1, 1:3]),  # bottom-left (centered)
+        fig.add_subplot(gs[1, 3:5])   # bottom-right (centered)
+    ]
+
+    datasets = [
+        ("ZOC-TN", zoctn_int, zoctn_bd),
+        ("ZOC-TB", zoctb_int, zoctb_bd),
+        ("ZOC-SG", zocsg_int, zocsg_bd),
+        ("Right-Skew (MD)",   md2_int,   md2_bd),
+        ("W-Shape (MD)",   md5_int,   md5_bd),
+    ]
+
+    for i, (title, y_int, y_bd) in enumerate(datasets):
+        ax = axs[i]
+        ax.set_title(title, fontsize=10)
+
+        ax.hist(
+            y_int,
+            bins=bins,
+            weights=np.ones(len(y_int)) / n_total,
+            color="mediumpurple",
+            edgecolor="rebeccapurple",
+            alpha=0.8
+        )
+
+        ax.axvline(x=0, color="orange", linestyle="--", linewidth=1)
+        ax.axvline(x=1, color="orange", linestyle="--", linewidth=1)
+
+        ax.hist(
+            y_bd,
+            bins=borders,
+            weights=np.ones(len(y_bd)) / n_total,
+            color="orange",
+            edgecolor="orange",
+            alpha=0.5
+        )
+
+        ax.set_xlabel(f"Y ~ {title}")
+
+        if i in (0, 3):
+            ax.set_ylabel("Relative Frequency")
+
+    plt.show()
+
+
+# ------------------------------------------------------------------
+# CODE FOR PLOTTING PIT RESIDUAL DIAGRAMS
+# ------------------------------------------------------------------
+def plot_pit_residuals_five_datasets(
+    pit_by_dataset,
+    dataset_order,
+    model_colors,
+    model_ls,
+    figsize=(12, 8),
+    linewidth=2.8,
+    ideal_linewidth=1.0,
+    show_counts=False,
+    symmetric_ylim=True,
+    ypad=0.02,
+):
+    if len(dataset_order) != 5:
+        raise ValueError("dataset_order must contain exactly 5 dataset names.")
+
+    curves = {}
+    ymin, ymax = np.inf, -np.inf
+
+    # ---- Precompute curves + global y-limits ----
+    for dataset_name in dataset_order:
+        if dataset_name not in pit_by_dataset:
+            raise KeyError(f"Dataset '{dataset_name}' not found.")
+
+        curves[dataset_name] = {}
+        model_dict = pit_by_dataset[dataset_name]
+
+        for model_name, u in model_dict.items():
+            if model_name not in model_colors:
+                raise KeyError(f"{model_name} missing in model_colors.")
+            if model_name not in model_ls:
+                raise KeyError(f"{model_name} missing in model_ls.")
+
+            u = np.asarray(u)
+            u = u[np.isfinite(u)]
+            u = np.clip(u, 0.0, 1.0)
+
+            if len(u) == 0:
+                continue
+
+            u_sorted = np.sort(u)
+            ecdf = np.arange(1, len(u_sorted) + 1) / len(u_sorted)
+            residual = ecdf - u_sorted
+
+            curves[dataset_name][model_name] = {
+                "x": u_sorted,
+                "y": residual,
+                "n": len(u),
+            }
+
+            ymin = min(ymin, residual.min())
+            ymax = max(ymax, residual.max())
+
+    if symmetric_ylim:
+        lim = max(abs(ymin), abs(ymax)) + ypad
+        ylim = (-lim, lim)
+    else:
+        ylim = (ymin - ypad, ymax + ypad)
+
+    # ---- Plot panels ----
+    fig = plt.figure(figsize=figsize, dpi=200)
+    gs = fig.add_gridspec(2, 6)
+
+    axes = [
+        fig.add_subplot(gs[0, 0:2]),
+        fig.add_subplot(gs[0, 2:4]),
+        fig.add_subplot(gs[0, 4:6]),
+        fig.add_subplot(gs[1, 1:3]),
+        fig.add_subplot(gs[1, 3:5]),
+    ]
+
+    legend_handles = {}
+    legend_labels = {}
+
+    def _plot_panel(ax, dataset_name, show_ylabel=False):
+        for model_name, d in curves[dataset_name].items():
+            label = (
+                f"{model_name} (n={d['n']})"
+                if show_counts
+                else model_name
+            )
+
+            idx = np.linspace(0, len(d["x"]) - 1, 300).astype(int)
+            x_plot = d["x"][idx]
+            y_plot = d["y"][idx]
+
+            line, = ax.step(
+                x_plot,
+                y_plot,
+                where="post",
+                color=model_colors[model_name],
+                linestyle=model_ls[model_name],
+                linewidth=linewidth,
+            )
+
+            # store only once per model
+            if model_name not in legend_handles:
+                legend_handles[model_name] = line
+                legend_labels[model_name] = label
+
+        # ideal line
+        ideal_line = ax.axhline(
+            0,
+            color="black",
+            linestyle="--",
+            linewidth=ideal_linewidth,
+        )
+
+        ax.set_xlim(0, 1)
+        ax.set_ylim(*ylim)
+        ax.set_xlabel("PIT")
+        if show_ylabel:
+            ax.set_ylabel("Empirical CDF - PIT")
+        ax.set_title(dataset_name)
+
+    for i, dataset_name in enumerate(dataset_order):
+        _plot_panel(
+            axes[i],
+            dataset_name,
+            show_ylabel=(i in [0, 3]),
+        )
+
+    # ---- Single legend to the right of bottom row ----
+    handles = list(legend_handles.values())
+    labels = list(legend_labels.values())
+
+    fig.legend(
+        handles,
+        labels,
+        loc="center left",
+        bbox_to_anchor=(0.72, 0.27),  # right of bottom row
+        frameon=False,
+    )
+
+    fig.tight_layout(rect=[0, 0, 0.85, 1])  # leave space for legend
+
+    return fig, axes

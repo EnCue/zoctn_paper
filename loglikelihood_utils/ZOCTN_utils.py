@@ -7,7 +7,6 @@ import scipy.special as sspecial
 # JAX NEEDED FOR AUTOMATIC DIFFERENTIATION
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 from jax.scipy import special as jspecial
 
 jax.config.update("jax_enable_x64", True)

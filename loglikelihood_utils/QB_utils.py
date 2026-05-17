@@ -1,12 +1,9 @@
 import numpy as np
 
-import scipy as sp
-from scipy import stats
 import scipy.special as sspecial
 
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 from jax.scipy import special as jspecial
 
 jax.config.update("jax_enable_x64", True)
@@ -50,6 +47,15 @@ def QB_predictive_mean(params, X):
 
     return EY
 
+
+# Stand-in for Quasi-B predictive density since Bernoulli QMLE yields no boundary masses 
+# (only to be used for AE(p) calculation in simulation study)
+def QB_predictive_distribution(X_test, beta, aux_params, include_interior=False, aux_transformed=False):
+    N = X_test.shape[0]
+
+    p0, p1 = np.zeros(N), np.zeros(N)
+
+    return p0, p1
 
 # ------------------------------------------------------------------
 # LIKELIHOODS FOR EVALUATION (CRPS, Log-score)
