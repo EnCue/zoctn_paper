@@ -4,7 +4,7 @@ This repository contains the Python code used to produce the results presented i
 
 In particular, code is organized toward two objectives 1) the simulation study presented in Section 3 of the paper, and 2) the empirical application to mortgage loss given default forecasting.
 
-The independent tree-boosted as well as Gaussian-process random effects (linear and tree-boosted) models are implemented using the GPBoost Python package: https://github.com/fabsig/GPBoost. Independent linear models implementations are handled using JAX (https://github.com/jax-ml/jax) and TensorFlow Probability (https://github.com/tensorflow/probability).
+The independent tree-boosted as well as Gaussian-process random effects (linear and tree-boosted) models are implemented using the GPBoost Python package: https://github.com/fabsig/GPBoost. Independent linear model implementations are handled using JAX (https://github.com/jax-ml/jax) and TensorFlow Probability (https://github.com/tensorflow/probability).
 
 ## Simulation Study
 Full specification of the independent linear models considered in the article are given in the respective model's Python file (e.g. `loglikelihood_utils/ZOCTN_utils.py`). `independent_linear_utils/fit_lm.py` provides an MLE fitting routine. A brief demonstration notebook is provided to reproduce select figures from Section 3 (`simulation_study/simulation_study.ipynb`).
