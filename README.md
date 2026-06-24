@@ -1,6 +1,6 @@
-# A Censored Transformed Model for Proportional Outcomes with Boundary Mass with an Application to Spatio-Temporal Mortgage Loss Given Default Modeling
+# A Censored Transformed Model for Proportional Outcomes with Boundary Mass and an Application to Loss Given Default Modeling
 
-This repository contains the Python code used to produce the results presented in the paper **"A Censored Transformed Model for Proportional Outcomes with Boundary Mass with an Application to Spatio-Temporal Mortgage Loss Given Default Modeling."**
+This repository contains the Python code used to produce the results presented in the paper **"A Censored Transformed Model for Proportional Outcomes with Boundary Mass and an Application to Loss Given Default Modeling."** Pre-print paper: https://arxiv.org/abs/2606.21515.
 
 In particular, code is organized toward two objectives 1) the simulation study presented in Section 3 of the paper, and 2) the empirical application to mortgage loss given default forecasting.
 
